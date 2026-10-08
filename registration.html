@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self'; connect-src https://bjkdfalvbvgjnhxspjxy.supabase.co; form-action 'none'; base-uri 'none'">
+<title>Вход · Калькулятор налёта</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root { color-scheme: dark; --bg: #0d1117; --surface: #151b24; --line: #2a3341; --text: #e8ecf2; --muted: #9aa5b5; --accent: #f0b44c; }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; background: var(--bg); color: var(--text); font-family: "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased; }
+  a, button, input { -webkit-tap-highlight-color: transparent; }
+  a { color: inherit; text-decoration: none; }
+  button, input { font: inherit; }
+  button, a { touch-action: manipulation; }
+  button { cursor: pointer; }
+  button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+  .shell { max-width: 960px; margin: auto; padding: max(28px, env(safe-area-inset-top)) 24px max(28px, env(safe-area-inset-bottom)); min-height: 100svh; display: flex; flex-direction: column; }
+  header { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+  .brand { display: inline-flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 650; }
+  .brand svg { width: 26px; height: 26px; color: var(--accent); }
+  .badge { border: 1px solid var(--line); border-radius: 20px; padding: 6px 10px; font-size: 11px; color: var(--muted); white-space: nowrap; }
+  main { width: 100%; max-width: 420px; margin: auto; padding: 56px 0 40px; }
+  .eyebrow { margin: 0 0 14px; color: var(--accent); font-size: 11px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; }
+  h1 { margin: 0; font-size: clamp(30px, 7vw, 38px); font-weight: 700; letter-spacing: -.045em; line-height: 1.15; }
+  .intro { margin: 16px 0 26px; font-size: 15px; line-height: 1.65; color: var(--muted); }
+  .card { border: 1px solid var(--line); border-radius: 20px; padding: 26px; background: var(--surface); box-shadow: 0 16px 44px #0000001c; }
+  .steps { display: flex; gap: 7px; margin-bottom: 26px; }
+  .steps span { height: 3px; width: 28px; background: var(--line); border-radius: 4px; }
+  .steps .active { background: var(--accent); }
+  label { display: block; margin-bottom: 9px; font-size: 13px; font-weight: 600; }
+  input { width: 100%; min-width: 0; border: 1px solid #344054; border-radius: 11px; padding: 15px 13px; background: #0f151e; color: var(--text); font-size: 16px; }
+  input::placeholder { color: #718097; }
+  input:focus { border-color: var(--accent); }
+  .help { margin: 11px 0 22px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+  .primary { display: flex; align-items: center; justify-content: center; gap: 12px; width: 100%; min-height: 50px; border: 0; border-radius: 11px; background: var(--accent); color: #201708; padding: 14px; font-size: 14px; font-weight: 750; }
+  .primary:hover { background: #f6c36b; }
+  .primary svg { width: 17px; height: 17px; }
+  .secondary { display: block; width: fit-content; margin: 22px auto 0; color: #bcc5d1; background: none; border: 0; font-size: 13px; padding: 8px; text-align: center; }
+  .secondary:hover { color: var(--text); }
+  .fine-print { margin: 23px 14px 0; color: var(--muted); font-size: 12px; text-align: center; line-height: 1.65; }
+  .fine-print strong { color: #c9d1dc; font-weight: 500; }
+  footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; color: #8793a5; font-size: 11px; text-align: center; line-height: 1.6; }
+  .footer-part { white-space: nowrap; }
+  .footer-separator { color: var(--accent); }
+  .email-display { display: block; margin-top: 4px; color: var(--text); overflow-wrap: anywhere; }
+  .code { text-align: center; letter-spacing: .36em; font-size: 28px; font-weight: 600; font-variant-numeric: tabular-nums; padding-left: 22px; }
+  .error { color: #ff969b; font-size: 12px; line-height: 1.5; margin: 10px 0; }
+  .error:empty { display: none; }
+  .back { display: inline-flex; align-items: center; gap: 7px; padding: 8px 0; margin: 0 0 22px; border: 0; background: none; color: var(--muted); font-size: 13px; }
+  .success-icon { display: grid; place-items: center; width: 56px; height: 56px; border: 1px solid #35513f; border-radius: 18px; background: #18291f; color: #98dab0; margin-bottom: 24px; }
+  .success-icon svg { width: 26px; height: 26px; }
+  .success-copy { color: var(--muted); font-size: 14px; line-height: 1.7; margin: 0 0 24px; }
+  button:disabled, input:disabled { opacity: .55; cursor: not-allowed; }
+  .setup-notice { margin: 0 0 24px; padding: 14px 16px; border: 1px solid #665032; border-radius: 12px; color: #e9c88e; background: #241e16; font-size: 13px; line-height: 1.65; }
+  @media (max-width: 480px) { .shell { padding-left: 20px; padding-right: 20px; } main { padding-top: 44px; } .card { padding: 22px; } .brand { font-size: 13px; } }
+  @media (max-width: 480px) { footer { flex-direction: column; gap: 2px; } .footer-separator { display: none; } }
+</style>
+</head>
+<body>
+<div class="shell">
+  <header>
+    <a class="brand" href="index.html" aria-label="Калькулятор налёта — на главную">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="m12 3 2.5 7 6.5 4v2l-7-2v5l2 2H8l2-2v-5l-7 2v-2l6.5-4L12 3Z" stroke-linejoin="round"/></svg>
+      Калькулятор налёта
+    </a>
+    
+  </header>
+  <main>
+    <p class="setup-notice" id="setupNotice" role="status" hidden></p>
+    <noscript><p class="setup-notice">Для входа включите JavaScript. Калькулятор доступен по ссылке вверху.</p></noscript>
+    <section id="emailStep" aria-labelledby="emailTitle">
+      <p class="eyebrow">Калькулятор налёта</p>
+      <h1 id="emailTitle">Вход в аккаунт</h1>
+      <p class="intro">Вход и регистрация — по почте, без пароля.<br>После входа журнал доступен с телефона и компьютера.</p>
+      <div class="card">
+        <div class="steps" aria-label="Шаг 1 из 2"><span class="active"></span><span></span></div>
+        <form id="emailForm" novalidate>
+          <label for="email">Электронная почта</label>
+          <input id="email" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com" required maxlength="254" aria-describedby="emailHelp emailError" autocapitalize="none" spellcheck="false">
+          <p class="error" id="emailError" role="alert"></p>
+          <p class="help" id="emailHelp">Для входа понадобится короткий код.<br>Придумывать и запоминать пароль не нужно.</p>
+          <button class="primary" id="sendCode" type="submit" disabled>Получить код <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 12h15m-6-6 6 6-6 6"/></svg></button>
+        </form>
+      </div>
+      <a class="secondary" href="index.html">Продолжить без аккаунта →</a>
+      <p class="fine-print">Без аккаунта записи останутся<br><strong>только в браузере этого устройства.</strong></p>
+    </section>
+
+    <section id="codeStep" aria-labelledby="codeTitle" hidden>
+      <button class="back" id="changeEmail" type="button">← Изменить почту</button>
+      <p class="eyebrow">Ещё один шаг</p>
+      <h1 id="codeTitle">Введите код</h1>
+      <p class="intro">Запросили письмо с кодом для<span class="email-display" id="emailDisplay"></span></p>
+      <div class="card">
+        <div class="steps" aria-label="Шаг 2 из 2"><span class="active"></span><span class="active"></span></div>
+        <form id="codeForm" novalidate>
+          <label for="code">Код из письма</label>
+          <input class="code" id="code" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" placeholder="000000" required aria-describedby="codeHelp codeError">
+          <p class="error" id="codeError" role="alert"></p>
+          <p class="help" id="codeHelp">Введите 6 цифр из последнего письма.<br>Если письма нет, проверьте папку «Спам».</p>
+          <button class="primary" id="verifyCode" type="submit">Войти</button>
+        </form>
+      </div>
+      <button class="secondary" id="resend" type="button">Отправить код ещё раз</button>
+      <p class="fine-print" id="resendStatus" role="status"></p>
+    </section>
+
+    <section id="successStep" aria-labelledby="successTitle" hidden>
+      <div class="success-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="m5 12 4 4L19 6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <p class="eyebrow">Всё готово</p>
+      <h1 id="successTitle" tabindex="-1">Можно к полётам</h1>
+      <p class="intro">Вы вошли как<span class="email-display" id="accountEmail"></span></p>
+      <div class="card">
+        <p class="success-copy">Почта подтверждена. Журнал аккаунта синхронизируется между устройствами. Записи, добавленные без входа, остаются на устройстве и не смешиваются с аккаунтом: перенести их можно через экспорт и импорт.</p>
+        <a class="primary" href="index.html">Открыть калькулятор →</a>
+      </div>
+      <button class="secondary" id="signOut" type="button">Выйти на этом устройстве</button>
+      <p class="error" id="accountError" role="alert"></p>
+    </section>
+  </main>
+  <footer><span class="footer-part">Вход по коду</span><span class="footer-separator" aria-hidden="true">·</span><span class="footer-part">Синхронизация с аккаунтом</span></footer>
+</div>
+<script src="auth-config.js" defer></script>
+<script src="vendor/supabase-2.117.3.js" defer></script>
+<script src="auth-client.js" defer></script>
+<script src="registration.js" defer></script>
+</body>
+</html>
