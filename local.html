@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="dark">
-<title>Журнал в аккаунте — Калькулятор налёта</title>
+<title>Калькулятор налёта</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -259,7 +259,6 @@
   .io-msg.ok { color: #7fd1a0; }
   .io-msg.err { color: var(--danger); }
 
-  button:disabled { opacity: .5; cursor: wait; }
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
   @media (max-width: 360px) { .total-value { font-size: 64px; } }
 </style>
@@ -267,6 +266,7 @@
 <body>
 <main>
   <a class="account-link" id="accountLink" href="registration.html">Войти</a>
+  <p class="io-msg" id="accountNote" hidden>Вы вошли. Налёт пока хранится только на этом устройстве.</p>
   <section class="total" aria-live="polite">
     <div class="total-label">Общий налёт</div>
     <div class="total-value">
@@ -306,8 +306,7 @@
       <input id="label" class="label-input" type="text" placeholder="Например, маршрут" autocomplete="off" maxlength="40">
     </label>
     <p class="hint" id="hint" role="alert"></p>
-    <p class="io-msg" id="modeNote" style="grid-column:1 / -1" role="status"></p>
-    <button class="add" id="add" type="button" disabled>Добавить</button>
+    <button class="add" id="add" type="button">Добавить</button>
   </div>
 
   <div class="list-head">
@@ -324,29 +323,222 @@
       <textarea id="io" spellcheck="false" autocomplete="off" placeholder="Здесь появится текст экспорта. Для импорта вставьте текст сюда."></textarea>
       <div class="btn-row">
         <button class="btn full" id="exp" type="button">Экспорт</button>
-        <button class="btn" id="impAdd" type="button" disabled>Импорт: добавить</button>
-        <button class="btn" id="impRep" type="button" disabled>Импорт: заменить</button>
+        <button class="btn" id="impAdd" type="button">Импорт: добавить</button>
+        <button class="btn" id="impRep" type="button">Импорт: заменить</button>
       </div>
       <p class="io-msg" id="ioMsg" role="status"></p>
     </div>
   </details>
-  <details class="backup" id="syncPanel">
-    <summary>Синхронизация</summary>
-    <div class="backup-body">
-      <p class="io-msg" id="syncStatus" role="status" aria-live="polite">Загрузка журнала…</p>
-      <p>Журнал обновляется автоматически. Если нужно, можно проверить новые записи вручную.</p>
-      <button class="btn" id="refresh" type="button">Обновить журнал</button>
-      <p>Записи, добавленные без входа, остаются на устройстве. В журнал аккаунта их можно перенести через экспорт и импорт.</p>
-    </div>
-  </details>
 </main>
 
+<script>
+(function () {
+  var KEY = "flight-time-entries-v2";
+  var entries = [];
 
+  var $ = function (id) { return document.getElementById(id); };
+  var hEl = $("h"), mEl = $("m"), aEl = $("a"), lEl = $("l"), nEl = $("label"), hint = $("hint");
+  var listEl = $("list"), emptyEl = $("empty"), clearBtn = $("clear");
+
+  function load() {
+    try {
+      var raw = localStorage.getItem(KEY);
+      var arr = raw ? JSON.parse(raw) : [];
+      if (Array.isArray(arr)) {
+        entries = arr.filter(function (e) { return e && typeof e.min === "number" && e.min >= 0; })
+          .map(function (e) {
+            return { min: e.min, appr: e.appr > 0 ? e.appr : 0, land: e.land > 0 ? e.land : 0, label: e.label || "" };
+          });
+      }
+    } catch (e) { entries = []; }
+  }
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify(entries)); } catch (e) {}
+  }
+
+  function pad(n) { return n < 10 ? "0" + n : "" + n; }
+  function fmt(totalMin) { return Math.floor(totalMin / 60) + ":" + pad(totalMin % 60); }
+
+  function render() {
+    var sum = 0, sa = 0, sl = 0;
+    entries.forEach(function (e) { sum += e.min; sa += e.appr; sl += e.land; });
+    $("tH").textContent = Math.floor(sum / 60);
+    $("tM").textContent = pad(sum % 60);
+    $("dec").textContent = (sum / 60).toFixed(2).replace(".", ",");
+    $("cnt").textContent = entries.length;
+    $("tA").textContent = sa;
+    $("tL").textContent = sl;
+
+    listEl.innerHTML = "";
+    entries.forEach(function (e, i) {
+      var li = document.createElement("li");
+      var info = document.createElement("div");
+      info.className = "info";
+      var name = document.createElement("div");
+      name.className = "name";
+      name.textContent = e.label || ("Задание " + (i + 1));
+      var meta = document.createElement("div");
+      meta.className = "meta";
+      meta.textContent = "Заходы: " + e.appr + ", посадки: " + e.land;
+      info.appendChild(name); info.appendChild(meta);
+      var time = document.createElement("div");
+      time.className = "time";
+      time.textContent = fmt(e.min);
+      var del = document.createElement("button");
+      del.className = "del";
+      del.type = "button";
+      del.setAttribute("aria-label", "Удалить: " + name.textContent);
+      del.innerHTML = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/></svg>';
+      del.addEventListener("click", function () {
+        entries.splice(i, 1);
+        save(); render();
+      });
+      li.appendChild(info); li.appendChild(time); li.appendChild(del);
+      listEl.appendChild(li);
+    });
+    emptyEl.hidden = entries.length > 0;
+    clearBtn.hidden = entries.length === 0;
+    disarm();
+  }
+
+  function num(el) {
+    var v = el.value.trim();
+    return v === "" ? 0 : Number(v);
+  }
+  function validInt(n) { return isFinite(n) && n >= 0 && n % 1 === 0; }
+
+  function add() {
+    var h = num(hEl), m = num(mEl), a = num(aEl), l = num(lEl);
+    if (!validInt(h) || !validInt(m) || !validInt(a) || !validInt(l)) {
+      hint.textContent = "Введите целые неотрицательные числа.";
+      return;
+    }
+    if (h === 0 && m === 0 && a === 0 && l === 0) {
+      hint.textContent = "Укажите время, заходы или посадки.";
+      return;
+    }
+    hint.textContent = "";
+    entries.push({ min: h * 60 + m, appr: a, land: l, label: nEl.value.trim() });
+    save();
+    hEl.value = ""; mEl.value = ""; aEl.value = ""; lEl.value = ""; nEl.value = "";
+    render();
+    hEl.focus();
+  }
+
+  var armTimer = null;
+  function disarm() {
+    clearTimeout(armTimer);
+    clearBtn.classList.remove("armed");
+    clearBtn.textContent = "Очистить всё";
+  }
+  clearBtn.addEventListener("click", function () {
+    if (clearBtn.classList.contains("armed")) {
+      entries = []; save(); render();
+    } else {
+      clearBtn.classList.add("armed");
+      clearBtn.textContent = "Нажмите ещё раз";
+      armTimer = setTimeout(disarm, 3000);
+    }
+  });
+
+  $("add").addEventListener("click", add);
+  var order = [hEl, mEl, aEl, lEl, nEl];
+  order.forEach(function (el, i) {
+    el.addEventListener("keydown", function (e) {
+      if (e.key !== "Enter") return;
+      e.preventDefault();
+      if (i < order.length - 1) order[i + 1].focus(); else add();
+    });
+    el.addEventListener("input", function () { hint.textContent = ""; });
+  });
+
+  /* Экспорт и импорт */
+  var ioBox = $("io"), ioMsg = $("ioMsg"), impRep = $("impRep");
+  function msg(text, kind) {
+    ioMsg.textContent = text || "";
+    ioMsg.className = "io-msg" + (kind ? " " + kind : "");
+  }
+  function isInt(n) { return typeof n === "number" && isFinite(n) && n >= 0 && n % 1 === 0; }
+
+  function parseImport(text) {
+    var obj;
+    try { obj = JSON.parse(text); } catch (e) { throw new Error("Не удалось прочитать текст. Вставьте его целиком, как при экспорте."); }
+    var arr = Array.isArray(obj) ? obj : (obj && obj.entries);
+    if (!Array.isArray(arr)) throw new Error("В тексте нет списка заданий.");
+    var good = [], bad = 0;
+    arr.forEach(function (e) {
+      if (e && isInt(e.min)) {
+        good.push({
+          min: e.min,
+          appr: isInt(e.appr) ? e.appr : 0,
+          land: isInt(e.land) ? e.land : 0,
+          label: typeof e.label === "string" ? e.label.slice(0, 40) : ""
+        });
+      } else { bad++; }
+    });
+    if (!good.length) throw new Error("Не найдено ни одного корректного задания.");
+    return { list: good, skipped: bad };
+  }
+
+  function copyText(text, done) {
+    function fallback() {
+      var ok = false;
+      try { ioBox.focus(); ioBox.select(); ok = document.execCommand("copy"); } catch (e) {}
+      done(ok);
+    }
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () { done(true); }, fallback);
+      } else { fallback(); }
+    } catch (e) { fallback(); }
+  }
+
+  $("exp").addEventListener("click", function () {
+    if (!entries.length) { ioBox.value = ""; msg("Список пуст, экспортировать нечего.", "err"); return; }
+    var text = JSON.stringify({ v: 2, entries: entries });
+    ioBox.value = text;
+    copyText(text, function (ok) {
+      ioBox.focus(); ioBox.select();
+      msg(ok ? "Текст скопирован. Сохраните его в заметки." : "Текст выделен. Скопируйте его вручную и сохраните.", ok ? "ok" : "");
+    });
+  });
+
+  function doImport(replace) {
+    var text = ioBox.value.trim();
+    if (!text) { msg("Вставьте текст экспорта в поле выше.", "err"); return false; }
+    var res;
+    try { res = parseImport(text); } catch (e) { msg(e.message, "err"); return false; }
+    entries = replace ? res.list : entries.concat(res.list);
+    save(); render();
+    ioBox.value = "";
+    msg((replace ? "Список заменён" : "Добавлено") + ": " + res.list.length + " " + "зад." +
+        (res.skipped ? ". Пропущено некорректных: " + res.skipped : ""), "ok");
+    return true;
+  }
+
+  $("impAdd").addEventListener("click", function () { disarmRep(); doImport(false); });
+
+  var repTimer = null;
+  function disarmRep() {
+    clearTimeout(repTimer);
+    impRep.classList.remove("armed");
+    impRep.textContent = "Импорт: заменить";
+  }
+  impRep.addEventListener("click", function () {
+    if (impRep.classList.contains("armed")) { disarmRep(); doImport(true); return; }
+    if (!ioBox.value.trim()) { msg("Вставьте текст экспорта в поле выше.", "err"); return; }
+    impRep.classList.add("armed");
+    impRep.textContent = "Заменить? Нажмите ещё раз";
+    repTimer = setTimeout(disarmRep, 3000);
+  });
+
+  load();
+  render();
+})();
+</script>
 <script src="auth-config.js" defer></script>
 <script src="supabase-2.117.3.js" defer></script>
-<script src="auth-client.js?v=sync-2" defer></script>
-<script src="cloud-store.js" defer></script>
-<script src="guest-store.js?v=guest-1" defer></script>
-<script src="cloud.js?v=guest-1" defer></script>
+<script src="auth-client.js" defer></script>
+<script src="account.js" defer></script>
 </body>
 </html>
