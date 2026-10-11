@@ -29,6 +29,8 @@ jobs:
           done
       - name: Test packaging and restricted deployment
         run: python3 -m unittest discover -s tests -p 'test_deploy.py' -v
+      - name: Test sign-in and flight journals
+        run: node --test tests/auth.test.cjs tests/cloud.test.cjs
       - name: Verify both website builds
         run: |
           python3 scripts/build-deploy-site.py --environment dev --output /tmp/flight-check-dev
