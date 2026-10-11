@@ -1,0 +1,102 @@
+name: Check and publish website
+
+on:
+  push:
+    branches: [dev, main]
+  pull_request:
+    branches: [dev, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: flight-site-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Check application JavaScript
+        run: |
+          for file in auth-config.js auth-client.js registration.js cloud-store.js guest-store.js cloud.js account.js; do
+            node --check "$file"
+          done
+      - name: Test packaging and restricted deployment
+        run: python3 -m unittest discover -s tests -p 'test_deploy.py' -v
+      - name: Verify both website builds
+        run: |
+          python3 scripts/build-deploy-site.py --environment dev --output /tmp/flight-check-dev
+          python3 scripts/build-deploy-site.py --environment production --output /tmp/flight-check-production
+
+  publish:
+    needs: check
+    if: >-
+      github.event_name != 'pull_request' &&
+      ((github.ref == 'refs/heads/dev' && vars.DEPLOY_ENABLED == 'true') ||
+       (github.ref == 'refs/heads/main' && vars.DEPLOY_PRODUCTION_ENABLED == 'true'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    environment: ${{ github.ref == 'refs/heads/main' && 'production' || 'dev' }}
+    env:
+      DEPLOY_ENV: ${{ github.ref == 'refs/heads/main' && 'production' || 'dev' }}
+      SITE_URL: ${{ github.ref == 'refs/heads/main' && 'https://moonhaze.ru' || 'https://dev.moonhaze.ru' }}
+      DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+      DEPLOY_PORT: ${{ vars.DEPLOY_PORT || '22' }}
+      DEPLOY_USER: ${{ vars.DEPLOY_USER }}
+      RELEASE_ID: ${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Prepare public files
+        run: >-
+          python3 scripts/build-deploy-site.py --environment "$DEPLOY_ENV" --output dist
+          --revision "$GITHUB_SHA" --release-id "$RELEASE_ID"
+      - name: Configure restricted SSH connection
+        env:
+          PRIVATE_KEY: ${{ secrets.DEPLOY_PRIVATE_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          [[ "$DEPLOY_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*$ ]]
+          [[ "$DEPLOY_USER" =~ ^[a-z_][a-z0-9_-]*$ ]]
+          [[ "$DEPLOY_PORT" =~ ^[0-9]+$ ]]
+          test -n "$PRIVATE_KEY"
+          test -n "$KNOWN_HOSTS"
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$PRIVATE_KEY" > "$HOME/.ssh/flight_deploy"
+          printf '%s\n' "$KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/flight_deploy" "$HOME/.ssh/known_hosts"
+      - name: Install release and check public HTTPS
+        run: |
+          set -euo pipefail
+          ssh_args=(-T -i "$HOME/.ssh/flight_deploy" -p "$DEPLOY_PORT"
+            -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes
+            -o ConnectTimeout=10 -o ServerAliveInterval=10 -o ServerAliveCountMax=3)
+          destination="$DEPLOY_USER@$DEPLOY_HOST"
+          tar -C dist -cf - . | ssh "${ssh_args[@]}" "$destination" "deploy $RELEASE_ID"
+          healthy=false
+          for attempt in 1 2 3; do
+            if curl --fail --silent --show-error --max-time 10 \
+              "$SITE_URL/release.json?deployment=$RELEASE_ID" -o /tmp/flight-release.json && \
+              python3 -c 'import json,os; r=json.load(open("/tmp/flight-release.json")); assert r["release_id"] == os.environ["RELEASE_ID"] and r["environment"] == os.environ["DEPLOY_ENV"]'; then
+              healthy=true
+              break
+            fi
+            sleep 2
+          done
+          if [ "$healthy" != true ]; then
+            echo 'Public HTTPS check failed; restoring the previous release.'
+            ssh "${ssh_args[@]}" "$destination" "rollback $RELEASE_ID"
+            exit 1
+          fi
+          printf 'Published %s: %s\n' "$SITE_URL" "$RELEASE_ID" >> "$GITHUB_STEP_SUMMARY"
+      - name: Remove temporary SSH files
+        if: always()
+        run: rm -f "$HOME/.ssh/flight_deploy" "$HOME/.ssh/known_hosts"
