@@ -1,0 +1,16 @@
+# Create this NEW site only; preserve the existing moonhaze.ru configuration.
+# First seed /srv/flight-time/dev/current, then enable this HTTP block.
+# Obtain a separate certificate for dev.moonhaze.ru before enabling GitHub publishing.
+server {
+    listen 80;
+    server_name dev.moonhaze.ru;
+
+    root /srv/flight-time/dev/current;
+    index index.html;
+    open_file_cache off;
+    expires -1;
+
+    location / {
+        try_files $uri $uri/ =404;
+    }
+}
