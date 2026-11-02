@@ -44,6 +44,7 @@
   }
 
   /* Итог */
+  .tool-nav { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
   .account-link {
     align-self: flex-end; color: var(--accent); font-size: 13px;
     text-decoration: none; padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px;
@@ -265,7 +266,10 @@
 </head>
 <body>
 <main>
-  <a class="account-link" id="accountLink" href="registration.html">Войти</a>
+  <nav class="tool-nav" aria-label="Инструменты">
+    <a class="account-link" href="/rpp/">Калькулятор РПП</a>
+    <a class="account-link" id="accountLink" href="registration.html">Войти</a>
+  </nav>
   <p class="io-msg" id="accountNote" hidden>Вы вошли. Налёт пока хранится только на этом устройстве.</p>
   <section class="total" aria-live="polite">
     <div class="total-label">Общий налёт</div>

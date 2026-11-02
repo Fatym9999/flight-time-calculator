@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="description" content="Предварительный расчёт полёта: курс, путевая скорость, время и топливо на борту. Маршруты сохраняются в браузере без входа.">
+<title>Калькулятор РПП</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{color-scheme:dark;--bg:#0d1117;--panel:#151b24;--surface-2:#1c2430;--line:#263041;--tx:#e8ecf2;--mu:#7f8b9c;--ac:#f0b44c;--calc:#7fd1ae;--bad:#e5646b;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.5 "Manrope",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased;min-height:100vh}
+main{max-width:1080px;margin:0 auto;padding:28px 18px 40px;min-width:0}
+header{margin-bottom:22px}
+.back{display:inline-flex;align-items:center;min-height:44px;color:var(--ac);font-size:13px;text-decoration:none;padding:8px 12px;border:1px solid var(--line);border-radius:10px;margin-bottom:18px}
+.back:hover{background:var(--panel)}
+h1{font-size:28px;line-height:1.2;letter-spacing:-.03em;margin:0 0 8px;font-weight:800}
+.subtitle{color:var(--mu);font-size:14px;margin:0;max-width:540px}
+.controls{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:14px;margin-bottom:18px}
+.bar{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;margin-bottom:18px}
+select,input,button{font:inherit;font-size:16px;color:var(--tx);background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;min-width:0;min-height:44px}
+button{cursor:pointer;font-weight:700}
+button:hover{filter:brightness(1.1)}
+button:active{background:var(--line)}
+:is(a,button,select,input,.wrap):focus-visible{outline:2px solid var(--ac);outline-offset:2px}
+select,#nm{width:100%}
+#add,#addleg{background:var(--ac);color:#1a1304;border-color:transparent}
+#del{color:var(--bad)}
+.params{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.params label{display:flex;flex-direction:column;font-size:12px;color:var(--mu);gap:6px}
+.params input{width:100%;font-size:20px;font-weight:700;color:var(--ac)}
+.table-hint{color:var(--mu);font-size:12px;margin:0 0 8px}
+.wrap{overflow-x:auto;max-width:100%;border:1px solid var(--line);border-radius:14px;background:var(--panel);overscroll-behavior-x:contain}
+table{border-collapse:collapse;width:100%;min-width:860px;table-layout:fixed;font-variant-numeric:tabular-nums}
+th,td{border-bottom:1px solid var(--line);border-right:1px solid var(--line);padding:0;text-align:center}
+th{font-size:12px;color:var(--mu);font-weight:600;padding:12px 4px;background:var(--surface-2)}
+th:nth-child(8){width:85px}th:nth-child(9){width:180px}th:last-child{width:44px}
+td input{width:100%;border:0;border-radius:0;background:transparent;text-align:center;padding:12px 2px;font-size:16px}
+td.pt input{text-align:left;padding-left:10px}
+td.c{color:var(--calc);padding:12px 4px;white-space:nowrap}
+td.fuel{color:var(--ac);font-weight:700}
+td.x button{border:0;background:transparent;color:var(--mu);padding:8px;width:100%;border-radius:0}
+tr.start td{background:var(--bg)}
+tr.tot td{background:var(--surface-2);font-weight:700;padding:12px 4px;color:var(--tx)}
+tr:last-child td{border-bottom:0}th:last-child,td:last-child{border-right:0}
+.err{color:var(--bad)}
+.sum{margin:18px 0;display:grid;gap:8px;font-size:15px;padding:16px;background:var(--panel);border:1px solid var(--line);border-radius:14px}
+.sum b{color:var(--ac)}
+.note{color:var(--mu);font-size:12px;margin-top:14px;max-width:720px}
+@media(max-width:599px){.bar select,.bar #nm{grid-column:1/-1}h1{font-size:26px}}
+@media(min-width:760px){.params{grid-template-columns:repeat(4,minmax(0,1fr))}.bar{grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto auto}}
+</style>
+</head>
+<body>
+<main>
+<header>
+<a class="back" href="/">← На главную</a>
+<h1>Калькулятор РПП</h1>
+<p class="subtitle">Предварительный расчёт полёта · топливо на борту</p>
+</header>
+<div class="controls">
+<div class="bar">
+<select id="sel" aria-label="Маршрут"></select>
+<input id="nm" placeholder="Название маршрута" aria-label="Название маршрута">
+<button id="add">Новый</button>
+<button id="del">Удалить</button>
+</div>
+<div class="params">
+<label>Ветер откуда, °<input id="d" inputmode="decimal"></label>
+<label>Ветер, м/с<input id="u" inputmode="decimal"></label>
+<label>Расход, гал/ч<input id="rate" inputmode="decimal"></label>
+<label>Остаток на посадке, гал<input id="res" inputmode="decimal"></label>
+</div>
+</div>
+<p class="table-hint" id="tableHint">Все столбцы таблицы доступны при прокрутке вбок →</p>
+<div class="wrap" role="region" aria-label="Расчёт маршрута" aria-describedby="tableHint" tabindex="0"><table aria-label="Этапы маршрута">
+<thead><tr><th>Н без</th><th>МПУ</th><th>МК</th><th>Vист</th><th>W</th><th>S</th><th>t</th><th>Топливо</th><th>Маршрут</th><th></th></tr></thead>
+<tbody id="tb"></tbody>
+</table></div>
+<div class="sum" id="sum"></div>
+<button id="addleg">Добавить этап</button>
+<div class="note">Топливо на борту считается от остатка на посадке снизу вверх. МК = МПУ + УС. Время в формате мин.сек. Маршруты хранятся в этом браузере.</div>
+</main>
+<script>
+var KEY='rpp_calc_v1';
+function def(){return{cur:0,routes:[{name:'Маршрут 1',d:'200',u:'5',rate:'9',res:'10',start:'ИШКВ',legs:[
+{h:'650',m:'219',v:'180',s:'14',p:'Ст. Письмянка'},{h:'650',m:'195',v:'180',s:'25',p:'R40 Рус.-Доб.'},
+{h:'650',m:'164',v:'180',s:'13',p:'Ст. Борис.'},{h:'700',m:'084',v:'180',s:'48',p:'Поповка'},
+{h:'770',m:'307',v:'180',s:'16',p:'R-40 Тагам'},{h:'650',m:'329',v:'180',s:'25',p:'Малая Буг.'},
+{h:'650',m:'329',v:'180',s:'16',p:'ИШКВ'}]}]}}
+var S;
+try{S=JSON.parse(localStorage.getItem(KEY));}catch(e){S=null}
+if(!S||!S.routes||!S.routes.length)S=def();
+S.routes.forEach(function(r,i){if(r.name==='ИШКВ')r.name='Маршрут '+(i+1)});
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+function R(){return S.routes[S.cur]}
+function $(i){return document.getElementById(i)}
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;')}
+function num(x){var n=parseFloat(String(x).replace(',','.'));return isNaN(n)?NaN:n}
+function fmt(sec){sec=Math.round(sec);var m=Math.floor(sec/60),s=sec%60;return m+'.'+(s<10?'0':'')+s}
+function leg(l,r){
+ var V=num(l.v),m=num(l.m),s=num(l.s),d=num(r.d),U=num(r.u)*3.6;
+ if(isNaN(V)||isNaN(m)||isNaN(s)||isNaN(d)||isNaN(U)||V<=0)return null;
+ var wa=(d-m)*Math.PI/180,x=U/V*Math.sin(wa);
+ if(Math.abs(x)>1)return null;
+ var c=Math.asin(x),w=V*Math.cos(c)-U*Math.cos(wa);
+ if(w<=0)return null;
+ var mk=((m+c*180/Math.PI)%360+360)%360;
+ return{mk:Math.round(mk)%360,w:Math.round(w),sec:s/w*3600};
+}
+function p3(n){var x=Math.round(n);return(x<10?'00':x<100?'0':'')+x}
+function drawSel(){
+ $('sel').innerHTML=S.routes.map(function(r,i){return'<option value="'+i+'"'+(i==S.cur?' selected':'')+'>'+esc(r.name)+'</option>'}).join('');
+}
+function build(){
+ var r=R();
+ $('nm').value=r.name;$('d').value=r.d;$('u').value=r.u;$('rate').value=r.rate;$('res').value=r.res;
+ var h='<tr class="start"><td colspan="7" style="text-align:right;padding:9px 8px;color:#8b9aa8">Взлёт</td><td class="c fuel" id="f0"></td><td class="pt"><input data-k="start" value="'+esc(r.start)+'"></td><td></td></tr>';
+ r.legs.forEach(function(l,i){
+  h+='<tr data-i="'+i+'"><td><input data-k="h" inputmode="numeric" value="'+esc(l.h)+'"></td>'+
+  '<td><input data-k="m" inputmode="numeric" value="'+esc(l.m)+'"></td>'+
+  '<td class="c" id="mk'+i+'"></td>'+
+  '<td><input data-k="v" inputmode="numeric" value="'+esc(l.v)+'"></td>'+
+  '<td class="c" id="w'+i+'"></td>'+
+  '<td><input data-k="s" inputmode="decimal" value="'+esc(l.s)+'"></td>'+
+  '<td class="c" id="t'+i+'"></td><td class="c fuel" id="f'+(i+1)+'"></td>'+
+  '<td class="pt"><input data-k="p" value="'+esc(l.p)+'"></td>'+
+  '<td class="x"><button data-del="'+i+'" aria-label="Удалить этап">×</button></td></tr>';
+ });
+ h+='<tr class="tot"><td colspan="5">Всего по маршруту</td><td id="ts"></td><td id="tt"></td><td id="tf"></td><td colspan="2"></td></tr>';
+ $('tb').innerHTML=h;
+ calc();
+}
+function calc(){
+ var r=R(),rate=num(r.rate),res=num(r.res),n=r.legs.length,ok=true,res_=[],sumS=0,sumT=0,burn=0;
+ r.legs.forEach(function(l,i){
+  var c=leg(l,r);res_.push(c);
+  if(!c)ok=false;
+  var s=num(l.s);if(!isNaN(s))sumS+=s;
+ });
+ var fuelOK=ok&&!isNaN(rate)&&!isNaN(res);
+ var board=new Array(n+1);
+ if(fuelOK){board[n]=res;for(var i=n-1;i>=0;i--){var f=res_[i].sec*rate/3600;board[i]=board[i+1]+f;burn+=f;sumT+=res_[i].sec}}
+ else res_.forEach(function(c){if(c)sumT+=c.sec});
+ r.legs.forEach(function(l,i){
+  var c=res_[i];
+  $('mk'+i).textContent=c?p3(c.mk):'—';
+  $('w'+i).textContent=c?c.w:'—';
+  $('t'+i).textContent=c?fmt(c.sec):'—';
+  $('f'+(i+1)).textContent=fuelOK?board[i+1].toFixed(2):'—';
+ });
+ $('f0').textContent=fuelOK?board[0].toFixed(2):'—';
+ $('ts').textContent=sumS%1?sumS.toFixed(1):sumS;
+ $('tt').textContent=ok?fmt(sumT):'—';
+ $('tf').textContent=fuelOK?burn.toFixed(2):'—';
+ var sec=Math.round(sumT),m=Math.floor(sec/60),s=sec%60;
+ $('sum').innerHTML=fuelOK?
+  '<div>Время: <b>'+fmt(sumT)+'</b> ('+m+' мин '+s+' с), S: <b>'+(sumS%1?sumS.toFixed(1):sumS)+' км</b></div>'+
+  '<div>Расход по маршруту: <b>'+burn.toFixed(2)+' гал</b></div>'+
+  '<div>На взлёте нужно: <b>'+board[0].toFixed(2)+' гал</b>, на посадке: <b>'+res+' гал</b></div>':
+  '<div class="err">Не хватает данных или ветер сильнее скорости. Проверь МПУ, Vист, S, ветер, расход, остаток.</div>';
+}
+document.addEventListener('input',function(e){
+ var t=e.target,r=R();
+ if(t.id==='d'||t.id==='u'||t.id==='rate'||t.id==='res'){r[t.id]=t.value;save();calc();return}
+ var k=t.getAttribute('data-k');if(!k)return;
+ var tr=t.closest('tr'),i=tr.getAttribute('data-i');
+ if(k==='start')r.start=t.value;else r.legs[+i][k]=t.value;
+ save();calc();
+});
+$('tb').addEventListener('click',function(e){
+ var b=e.target.closest('[data-del]');if(!b)return;
+ var r=R();if(r.legs.length<2)return;
+ r.legs.splice(+b.getAttribute('data-del'),1);save();build();
+});
+$('addleg').onclick=function(){
+ var r=R(),last=r.legs[r.legs.length-1]||{h:'650',m:'',v:'180',s:'',p:''};
+ r.legs.push({h:last.h,m:'',v:last.v||'180',s:'',p:''});save();build();
+};
+$('sel').onchange=function(){S.cur=+this.value;save();build()};
+$('nm').addEventListener('input',function(){
+ R().name=this.value;save();
+ $('sel').options[S.cur].textContent=this.value||'Без названия';
+});
+$('add').onclick=function(){
+ var c=JSON.parse(JSON.stringify(R()));
+ c.name='Маршрут '+(S.routes.length+1);
+ S.routes.push(c);
+ S.cur=S.routes.length-1;save();drawSel();build();
+ $('nm').focus();$('nm').select();
+};
+var delT=null;
+$('del').onclick=function(){
+ var b=this;
+ if(S.routes.length<2){b.textContent='Нужен 1 маршрут';setTimeout(function(){b.textContent='Удалить'},2000);return}
+ if(!delT){b.textContent='Точно удалить?';delT=setTimeout(function(){delT=null;b.textContent='Удалить'},3000);return}
+ clearTimeout(delT);delT=null;b.textContent='Удалить';
+ S.routes.splice(S.cur,1);S.cur=0;save();drawSel();build();
+};
+drawSel();build();
+</script>
+</body>
+</html>

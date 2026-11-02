@@ -13,7 +13,7 @@ import tempfile
 import uuid
 
 PUBLIC_FILES = frozenset((
-    "index.html", "local.html", "registration.html", "auth-config.js", "auth-client.js",
+    "index.html", "local.html", "registration.html", "rpp/index.html", "auth-config.js", "auth-client.js",
     "registration.js", "cloud-store.js", "guest-store.js", "cloud.js", "account.js",
     "vendor/supabase-2.117.3.js", "vendor/supabase-LICENSE",
 ))
@@ -57,7 +57,7 @@ def unpack(stream, stage, environment, release_id):
                 name = str(path)
                 if path.is_absolute() or ".." in path.parts:
                     raise ValueError("Unsafe archive path")
-                if member.isdir() and name in (".", "vendor"):
+                if member.isdir() and name in (".", "vendor", "rpp"):
                     continue
                 if not member.isfile() or name not in PUBLIC_FILES | {"release.json"} or name in seen:
                     raise ValueError(f"Unexpected archive member: {name}")
@@ -66,6 +66,7 @@ def unpack(stream, stage, environment, release_id):
                 seen.add(name)
                 destination = stage / name
                 destination.parent.mkdir(parents=True, exist_ok=True, mode=0o755)
+                destination.parent.chmod(0o755)
                 digest = hashlib.sha256()
                 with bundle.extractfile(member) as incoming, destination.open("xb") as outgoing:
                     while chunk := incoming.read(65536):

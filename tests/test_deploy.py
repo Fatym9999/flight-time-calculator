@@ -39,6 +39,8 @@ class DeploymentTests(unittest.TestCase):
         (self.source / "index.html").write_text('<title>Main</title><script src="supabase-2.117.3.js"></script>')
         (self.source / "local.html").write_text('<title>Local</title>')
         (self.source / "registration.html").write_text('<title>Login</title><a href="index.html">Calculator</a>')
+        (self.source / "rpp").mkdir()
+        (self.source / "rpp/index.html").write_text("<title>RPP</title><a href=\"/\">Home</a><script>var KEY='rpp_calc_v1';</script>")
         for name in builder.VENDOR_FILES:
             (self.source / name).write_text("vendor fixture")
         self.count = 0
@@ -77,6 +79,30 @@ class DeploymentTests(unittest.TestCase):
         self.assertIn('src="vendor/supabase-2.117.3.js"', (output / "index.html").read_text())
         self.assertEqual({str(p.relative_to(output)) for p in output.rglob("*") if p.is_file()},
                          receiver.PUBLIC_FILES | {"release.json"})
+
+    def test_rpp_directory_links_and_storage_key_survive_both_builds(self):
+        (self.source / "index.html").write_text('<title>Main</title><a href="/rpp/">RPP</a>')
+        for environment in ("dev", "production"):
+            with self.subTest(environment=environment):
+                _, output = self.release(environment)
+                page = (output / "rpp/index.html").read_text()
+                self.assertIn("var KEY='rpp_calc_v1';", page)
+                self.assertEqual("[DEV]" in page, environment == "dev")
+                self.assertIn('href="/"', page)
+
+    def test_nested_page_missing_asset_stops_build(self):
+        (self.source / "rpp/index.html").write_text('<script src="missing.js"></script>')
+        with self.assertRaisesRegex(ValueError, "Missing asset"):
+            self.release()
+
+    def test_real_tar_with_rpp_directory_can_be_published(self):
+        release_id, output = self.release("dev")
+        buffer = io.BytesIO()
+        with tarfile.open(fileobj=buffer, mode="w") as bundle:
+            bundle.add(output, arcname=".")
+        buffer.seek(0)
+        receiver.receive(self.server, "dev", "deploy " + release_id, buffer)
+        self.assertTrue((self.server / "dev/current/rpp/index.html").is_file())
 
     def test_source_layout_selects_unified_calculator(self):
         (self.source / "cloud.html").write_text('<title>Unified</title><a href="cloud.html">Home</a>')
@@ -189,7 +215,7 @@ class DeploymentTests(unittest.TestCase):
             os.umask(previous)
         home = self.server / "production"
         release = home / "releases" / release_id
-        for directory in (home, home / "releases", release, release / "vendor"):
+        for directory in (home, home / "releases", release, release / "vendor", release / "rpp"):
             self.assertEqual(directory.stat().st_mode & 0o777, 0o755)
         for path in release.rglob("*"):
             if path.is_file():
