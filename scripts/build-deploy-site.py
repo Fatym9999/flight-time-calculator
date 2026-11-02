@@ -10,7 +10,7 @@ APP_FILES = (
     "guest-store.js", "cloud.js", "account.js",
 )
 VENDOR_FILES = ("supabase-2.117.3.js", "supabase-LICENSE")
-PUBLIC_FILES = frozenset(("index.html", "local.html", "registration.html", *APP_FILES,
+PUBLIC_FILES = frozenset(("index.html", "local.html", "registration.html", "rpp/index.html", *APP_FILES,
                           *("vendor/" + name for name in VENDOR_FILES)))
 
 
@@ -26,6 +26,7 @@ def build(source, output, environment, revision, release_id):
         "index.html": "cloud.html" if source_layout else "index.html",
         "local.html": "index.html" if source_layout else "local.html",
         "registration.html": "registration.html",
+        "rpp/index.html": "rpp/index.html",
     }
     texts = {name: (source / original).read_text() for name, original in pages.items()}
     for name in APP_FILES:
@@ -44,6 +45,7 @@ def build(source, output, environment, revision, release_id):
             key = "flight-time-test-guest-v1" if environment == "dev" else "flight-time-entries-v2"
             value = re.sub(r'(["\'])(?:flight-time-test-guest-v1|flight-time-entries-v2)\1',
                            lambda match: match[1] + key + match[1], value)
+        (output / name).parent.mkdir(parents=True, exist_ok=True)
         (output / name).write_text(value)
     (output / "vendor").mkdir()
     for name in VENDOR_FILES:
@@ -51,10 +53,14 @@ def build(source, output, environment, revision, release_id):
         if not candidate.is_file():
             candidate = source / name
         (output / "vendor" / name).write_bytes(candidate.read_bytes())
-    for page in output.glob("*.html"):
+    for page in output.rglob("*.html"):
         for target in re.findall(r'(?:href|src)="([^"]+)"', page.read_text()):
             if ":" not in target and not target.startswith("#"):
-                if not (page.parent / target.split("?")[0]).is_file():
+                path = target.split("?")[0].split("#")[0]
+                asset = output / path.lstrip("/") if path.startswith("/") else page.parent / path
+                if path.endswith("/"):
+                    asset = asset / "index.html"
+                if not asset.is_file():
                     raise ValueError(f"Missing asset: {page.name}: {target}")
     manifest = {name: hashlib.sha256((output / name).read_bytes()).hexdigest()
                 for name in sorted(PUBLIC_FILES)}
